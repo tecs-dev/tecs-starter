@@ -342,7 +342,7 @@ local function ensure_types()
     if is_windows then
         copy_dir(path_join(tecs_dir, "types"), "types", "/XD luassert /XF busted.d.tl")
     else
-        copy_dir(path_join(tecs_dir, "types"), "types", "--exclude='busted.d.tl' --exclude='luassert'")
+        copy_dir(path_join(tecs_dir, "types"), "types", '--exclude="busted.d.tl" --exclude="luassert"')
     end
 end
 
@@ -429,7 +429,7 @@ local function copy_assets()
         return
     end
     status("Copying assets...")
-    local excludes = is_windows and "/XF *.ase *.aseprite" or "--exclude='*.ase' --exclude='*.aseprite'"
+    local excludes = is_windows and "/XF *.ase *.aseprite" or '--exclude="*.ase" --exclude="*.aseprite"'
     copy_dir("assets", "build/assets", excludes)
     write_file(stamp, tostring(os.time()) .. "\n")
 end
