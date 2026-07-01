@@ -11,11 +11,12 @@ local is_windows = sep == "\\" and not is_msys
 local uses_cmd_shell = host_sep == "\\"
 
 -- Local Tecs/Tecs2D checkout used for installs and dev mode. Override with
--- TECS_DIR; otherwise default to ~/projects/tecs (or ../tecs as a last resort).
-local tecs_dir = os.getenv("TECS_DIR")
-    or (os.getenv("HOME") and (os.getenv("HOME") .. "/projects/tecs"))
-    or (os.getenv("USERPROFILE") and (os.getenv("USERPROFILE") .. "\\projects\\tecs"))
-    or "../tecs"
+-- TECS_DIR; otherwise use a sibling checkout, matching the CI layout.
+local function default_tecs_dir()
+    return sep == "\\" and "..\\tecs" or "../tecs"
+end
+
+local tecs_dir = os.getenv("TECS_DIR") or default_tecs_dir()
 
 local vendor_lua = "src/vendor/share/lua/5.1"  -- installed LuaRocks module tree
 local love12_dir = ".love12"                   -- downloaded Love2D 12 runtime
@@ -140,6 +141,14 @@ local function write_file(path, content)
     local f = assert(io.open(path, "wb"))
     f:write(content)
     f:close()
+end
+
+local function read_file(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local content = f:read("*a")
+    f:close()
+    return content
 end
 
 local function remove(path)
@@ -308,13 +317,14 @@ end
 
 -- Prefix a command with the LUA_PATH the Teal compiler needs.
 local function with_lua_path(cmd)
+    local bin = path_join("src/vendor/bin")
     if is_msys and uses_cmd_shell then
-        return posix_cmd("LUA_PATH=" .. q(lua_path()) .. " " .. cmd)
+        return posix_cmd("PATH=" .. q(bin) .. ':$PATH LUA_PATH=' .. q(lua_path()) .. " " .. cmd)
     end
     if uses_cmd_shell then
-        return 'cmd /C "set LUA_PATH=' .. lua_path() .. '&& ' .. cmd .. '"'
+        return 'cmd /C "set PATH=' .. normalize(bin) .. ';%PATH%&& set LUA_PATH=' .. lua_path() .. '&& ' .. cmd .. '"'
     end
-    return "LUA_PATH=" .. q(lua_path()) .. " " .. cmd
+    return "PATH=" .. q(bin) .. ':$PATH LUA_PATH=' .. q(lua_path()) .. " " .. cmd
 end
 
 -- Run a command from inside the local Tecs checkout with its luarocks bin
@@ -325,6 +335,26 @@ local function tecs_cmd(cmd)
         return 'cmd /C "cd /D ' .. q(tecs_dir) .. " && set PATH=" .. normalize(bin) .. ';%PATH%&& ' .. cmd .. '"'
     end
     return posix_cmd("cd " .. q(normalize(tecs_dir)) .. " && PATH=" .. q(bin) .. ':$PATH ' .. cmd)
+end
+
+local function tecs_tl_ref()
+    local makefile = read_file(path_join(tecs_dir, "Makefile")) or ""
+    return makefile:match("\nTL_REF%s*%?=%s*([%w]+)") or makefile:match("^TL_REF%s*%?=%s*([%w]+)")
+end
+
+local function ensure_teal_compiler()
+    if exists(path_join("src/vendor/bin/tl")) then return end
+    local ref = tecs_tl_ref()
+    if not ref then
+        error("Could not find TL_REF in " .. path_join(tecs_dir, "Makefile"), 0)
+    end
+    status("Installing Teal compiler...")
+    local tmp = path_join(".tecs-tmp", "tl")
+    remove(tmp)
+    run("git clone " .. q("https://github.com/teal-language/tl.git") .. " " .. q(tmp))
+    run("cd " .. q(tmp) .. " && git checkout " .. q(ref))
+    run("cd " .. q(tmp) .. " && luarocks make --tree=" .. q(path_join(cwd(), "src/vendor")) .. " --lua-version=5.1 tl-dev-1.rockspec")
+    remove(path_join(".tecs-tmp"))
 end
 
 -- Path to the downloaded Love2D executable for this platform.
@@ -370,6 +400,9 @@ end
 
 -- Install Tecs/Tecs2D into src/vendor via luarocks on first use.
 local function ensure_vendor()
+    ensure_teal_compiler()
+    if exists(path_join(vendor_lua, "tecs2d/init.tl")) then return end
+    sync_local_tecs()
     if exists(path_join(vendor_lua, "tecs2d/init.tl")) then return end
     status("Installing Tecs and Tecs2D dependencies...")
     run(tecs_cmd("luarocks make --tree=" .. q(path_join(cwd(), "src/vendor")) .. " --lua-version=5.1 tecs-dev-1.rockspec"))
@@ -430,6 +463,24 @@ local function compile_sources()
     if compiled == 0 then status("Teal output is up to date.") end
 end
 
+-- Compile vendored Tecs/Tecs2D sources after staging them into build/. This
+-- keeps the starter working with Teal releases that do not support `gen --root`.
+local function compile_vendor_tecs_sources()
+    local root = path_join("build/vendor/share/lua/5.1")
+    local compiled = 0
+    for _, src in ipairs(list_files(root, ".tl")) do
+        local n = normalize(src)
+        if (n:match("[/\\]tecs[/\\]") or n:match("[/\\]tecs2d[/\\]")) and not n:match("%.d%.tl$") then
+            local out = n:gsub("%.tl$", ".lua")
+            if needs_update(out, n, "tlconfig.lua") then
+                if compiled == 0 then status("Compiling vendored Tecs...") end
+                run(with_lua_path("tl gen " .. q(n) .. " -o " .. q(out)))
+                compiled = compiled + 1
+            end
+        end
+    end
+end
+
 -- Copy assets/ into build/, skipping source-only files; stamp guards reruns.
 local function copy_assets()
     if not exists("assets") then return end
@@ -452,7 +503,7 @@ local function copy_vendor()
     local tecs_build = path_join(tecs_dir, "build/tecs")
     local tecs2d_build = path_join(tecs_dir, "build/tecs2d")
     local vendor_time = math.max(
-        file_mtime("src/vendor"),
+        tree_mtime("src/vendor"),
         file_mtime(path_join(tecs_build, "init.lua")),
         file_mtime(path_join(tecs2d_build, "init.lua"))
     )
@@ -472,6 +523,7 @@ local function copy_vendor()
         copy_dir(tecs_build, path_join("build/vendor/share/lua/5.1/tecs"))
         copy_dir(tecs2d_build, path_join("build/vendor/share/lua/5.1/tecs2d"))
     end
+    compile_vendor_tecs_sources()
 
     local tecs = path_join("build/vendor/share/lua/5.1/tecs")
     local tecs2d = path_join("build/vendor/share/lua/5.1/tecs2d")
@@ -503,6 +555,7 @@ Targets:
   build      Compile without running
   check      Type-check all Teal source files
   clean      Remove build artifacts
+  wipe-clean Remove build artifacts, vendored dependencies, and Love2D
   love12     Re-download Love2D 12
   dev        Prepare local Tecs source for development
   sync-tecs  Reinstall Tecs/Tecs2D from local rockspecs
@@ -549,6 +602,13 @@ end
 function tasks.clean()
     status("Removing build artifacts...")
     remove("build")
+end
+
+tasks["wipe-clean"] = function()
+    status("Removing build artifacts, vendored dependencies, and Love2D...")
+    remove("build")
+    remove("src/vendor")
+    remove(love12_dir)
 end
 
 function tasks.love12()
