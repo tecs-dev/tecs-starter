@@ -556,8 +556,10 @@ local function copy_vendor()
     end
 
     if exists(path_join(tecs_build, "init.lua")) and exists(path_join(tecs2d_build, "init.lua")) then
-        copy_dir(tecs_build, path_join("build/vendor/share/lua/5.1/tecs"))
-        copy_dir(tecs2d_build, path_join("build/vendor/share/lua/5.1/tecs2d"))
+        -- Local rock builds can contain package self-links that point outside the
+        -- build tree. rsync -L follows them, so skip those generated links.
+        copy_dir(tecs_build, path_join("build/vendor/share/lua/5.1/tecs"), '--exclude="/tecs"')
+        copy_dir(tecs2d_build, path_join("build/vendor/share/lua/5.1/tecs2d"), '--exclude="/tecs2d" --exclude="/assets/internal/internal"')
     end
     compile_vendor_tecs_sources()
 
