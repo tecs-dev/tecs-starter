@@ -62,7 +62,9 @@ jobs:
           $scoop = Join-Path $env:USERPROFILE "scoop\shims\scoop"
           & $scoop bucket add tecs https://github.com/tecs-dev/scoop-bucket
           & $scoop install tecs
-          Join-Path $env:USERPROFILE "scoop\shims" | Out-File -Append $env:GITHUB_PATH
+          $tecs = Join-Path $env:USERPROFILE "scoop\shims\tecs.cmd"
+          if (-not (Test-Path $tecs)) { throw "scoop did not create the tecs shim" }
+          "TECS=$tecs" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
       - name: Type-check and build
         shell: pwsh
@@ -70,8 +72,8 @@ jobs:
           TECS_CACHE_DIR: ${{ runner.temp }}\tecs-cache
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          tecs info
-          tecs check
-          tecs build
+          & $env:TECS info
+          & $env:TECS check
+          & $env:TECS build
           if (-not (Test-Path "build\main.lua")) { throw "main.lua was not built" }
           if (-not (Test-Path "build\tecs2d\init.lua")) { throw "tecs2d was not built" }
