@@ -7,11 +7,9 @@ a high-performance ECS framework.
 
 ## Prerequisites
 
-Install these tools before using this template:
-
-1. **LuaJIT** - The Lua 5.1 runtime used by Tecs and `tecs-cli`
-2. **LuaRocks** - Lua package manager ([installation](https://github.com/luarocks/luarocks/blob/main/docs/download.md))
-3. **tecs-cli** - Install from [tecs-dev/tecs-cli](https://github.com/tecs-dev/tecs-cli)
+Install [`tecs-cli`](https://github.com/tecs-dev/tecs-cli). It downloads a
+tested LÖVE 12 runtime on first use; LuaJIT, LuaRocks, and a compiler toolchain
+are not required.
 
 ## Quick Start
 
@@ -21,10 +19,9 @@ cd my-game
 tecs run
 ```
 
-That's it! The first run automatically installs the Teal development release,
-downloads Love2D 12 and type definitions, and installs the project dependency
-tree. A sibling Tecs checkout (or `TECS_DIR`) is used automatically for local
-development. You should see a scrolling shooter demo.
+That's it! The first command downloads LÖVE 12 into the user cache. The
+headless CLI payload already contains Teal, Tecs/Tecs2D, type declarations, and
+the starter toolchain. You should see a scrolling shooter demo.
 
 ## Project Structure
 
@@ -40,7 +37,7 @@ my-game/
 │       └── states/       # Focused state/gameplay plugins
 ├── assets/               # Images, sounds, fonts
 ├── build/                # Self-contained, runtime-only output (generated)
-└── src/vendor/           # Installed rocks and dependencies (generated)
+└── src/vendor/           # Embedded framework sources and declarations (generated)
 ```
 
 ## Build Targets
@@ -83,13 +80,9 @@ watchexec -w src -w assets 'tecs build'
 
 ## Managing Dependencies
 
-```bash
-# Add a package
-luarocks install --tree=src/vendor --lua-version=5.1 penlight
-
-# Add a specific version
-luarocks install --tree=src/vendor --lua-version=5.1 penlight 1.14.0
-```
+The generated game uses LÖVE's LuaJIT runtime and its bundled modules. Place
+additional pure-Lua modules under `src/vendor/share/lua/5.1`; `tecs build`
+copies runtime modules into the self-contained build output.
 
 ## Demo Controls
 

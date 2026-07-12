@@ -6,25 +6,23 @@ on:
   pull_request:
 
 jobs:
-  check-build:
+  unix:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-
-    env:
-      TECS_DIR: ${{ github.workspace }}/tecs
+        os: [ubuntu-latest, macos-latest]
 
     steps:
       - name: Check out starter
         uses: actions/checkout@v4
+
+      - name: Check out CLI
+        uses: actions/checkout@v4
         with:
-          path: tecs-starter
+          repository: tecs-dev/tecs-cli
+          path: tecs-cli
 
       - name: Check out Tecs
         uses: actions/checkout@v4
@@ -32,85 +30,34 @@ jobs:
           repository: tecs-dev/tecs
           path: tecs
 
-      - name: Check out tecs-cli
-        uses: actions/checkout@v4
-        with:
-          repository: tecs-dev/tecs-cli
-          path: tecs-cli
+      - name: Build tecs-cli.love
+        env:
+          TECS_DIR: ${{ github.workspace }}/tecs
+        run: tecs-cli/scripts/build_love.sh
 
-      # Lua 5.4 runs only the LuaRocks frontend so it can parse the registry's
-      # oversized manifest. LuaJIT below remains the Lua 5.1 target and game VM.
-      - name: Set up Lua 5.4 for LuaRocks
+      - name: Type-check and build with option 1
+        env:
+          TECS_CACHE_DIR: ${{ runner.temp }}/tecs-cache
+          TECS_CLI_LOVE: ${{ github.workspace }}/tecs-cli/dist/tecs-cli.love
         run: |
-          curl -fsSL https://www.lua.org/ftp/lua-5.4.8.tar.gz | tar xz -C "$RUNNER_TEMP"
-          make -C "$RUNNER_TEMP/lua-5.4.8/src" posix
-          echo "TECS_LUA54=$RUNNER_TEMP/lua-5.4.8/src/lua" >> "$GITHUB_ENV"
+          env -u TECS_DIR tecs-cli/launcher/tecs check
+          env -u TECS_DIR tecs-cli/launcher/tecs build
+          test -f build/main.lua
+          test -f build/tecs2d/init.lua
 
-      - name: Set up LuaJIT
-        uses: leafo/gh-actions-lua@v11
-        with:
-          luaVersion: "luajit"
-
-      - name: Set up LuaRocks
-        uses: leafo/gh-actions-luarocks@v4
-        with:
-          luarocksVersion: "3.12.2"
-
-      # Keep the starter and CLI on ordinary package names while Lua 5.4
-      # handles only LuaRocks's oversized registry manifest.
-      - name: Wrap LuaRocks with Lua 5.4
-        run: |
-          real_luarocks="$(command -v luarocks)"
-          mkdir -p "$RUNNER_TEMP/lua54-bin"
-          printf '%s\n' '#!/usr/bin/env bash' \
-            "exec \"$TECS_LUA54\" \"$real_luarocks\" \"\$@\"" \
-            > "$RUNNER_TEMP/lua54-bin/luarocks"
-          chmod +x "$RUNNER_TEMP/lua54-bin/luarocks"
-          echo "TECS_LUAROCKS=$real_luarocks" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/lua54-bin" >> "$GITHUB_PATH"
-
-      - name: Install tecs-cli
-        working-directory: tecs-cli
-        run: |
-          lr() { "$TECS_LUA54" "$TECS_LUAROCKS" --lua-version=5.1 "$@"; }
-          lr install --local luafilesystem
-          lr make --local --deps-mode=none tecs-cli-0.1.0-1.rockspec
-
-      - name: Install Teal
-        working-directory: tecs-starter
-        run: |
-          vendor_tree="$PWD/src/vendor"
-          "$TECS_LUA54" "$TECS_LUAROCKS" --lua-version=5.1 --dev \
-            install --tree="$vendor_tree" tl
-
-      - name: Type-check
-        working-directory: tecs-starter
-        run: |
-          eval "$(luarocks --lua-version=5.1 path --local --bin)"
-          tecs check
-
-      - name: Build
-        working-directory: tecs-starter
-        run: |
-          eval "$(luarocks --lua-version=5.1 path --local --bin)"
-          tecs build
-
-  check-build-windows:
+  windows:
     name: windows-latest
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    env:
-      TECS_DIR: ${{ github.workspace }}/tecs
-      TECS_LUA54: /mingw64/bin/lua5.4.exe
 
     steps:
       - name: Check out starter
         uses: actions/checkout@v4
+
+      - name: Check out CLI
+        uses: actions/checkout@v4
         with:
-          path: tecs-starter
+          repository: tecs-dev/tecs-cli
+          path: tecs-cli
 
       - name: Check out Tecs
         uses: actions/checkout@v4
@@ -118,100 +65,21 @@ jobs:
           repository: tecs-dev/tecs
           path: tecs
 
-      - name: Check out tecs-cli
-        uses: actions/checkout@v4
-        with:
-          repository: tecs-dev/tecs-cli
-          path: tecs-cli
+      - name: Build tecs-cli.love
+        shell: bash
+        env:
+          TECS_DIR: ${{ github.workspace }}/tecs
+        run: tecs-cli/scripts/build_love.sh
 
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            git
-            make
-            curl
-            unzip
-            zip
-            tar
-            rsync
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-7zip
-            mingw-w64-x86_64-lua54
-            mingw-w64-x86_64-luajit
-
-      - name: Install LuaRocks
+      - name: Type-check and build with option 1
+        shell: pwsh
+        env:
+          TECS_CACHE_DIR: ${{ runner.temp }}\tecs-cache
+          TECS_CLI_LOVE: ${{ github.workspace }}\tecs-cli\dist\tecs-cli.love
         run: |
-          ver=3.12.2
-          curl -L -o luarocks.tar.gz "https://luarocks.org/releases/luarocks-${ver}.tar.gz"
-          tar xzf luarocks.tar.gz
-          cd "luarocks-${ver}"
-          ./configure --prefix=/mingw64 --lua-version=5.1 \
-            --with-lua-interpreter=luajit \
-            --with-lua=/mingw64 \
-            --with-lua-include=/mingw64/include/luajit-2.1
-          make
-          make install
-          mkdir -p /mingw64/share/lua/5.4
-          cp -R /mingw64/share/lua/5.1/luarocks /mingw64/share/lua/5.4/
-
-      - name: Configure LuaRocks
-        run: |
-          mkdir -p "$HOME/bin"
-          real_luarocks="$(command -v luarocks)"
-          echo "TECS_LUAROCKS=$real_luarocks" >> "$GITHUB_ENV"
-          printf '%s\n' \
-            '#!/usr/bin/env bash' \
-            'exec "$TECS_LUA54" '"\"$real_luarocks\""' "$@"' \
-            > "$HOME/bin/luarocks"
-          chmod +x "$HOME/bin/luarocks"
-          export PATH="$HOME/bin:$PATH"
-          printf '%s\n' \
-            '#!/usr/bin/env bash' \
-            'a=()' \
-            'for x in "$@"; do' \
-            '  x="${x//\\//}"' \
-            '  if [[ "$x" == */\*.\* ]]; then x="${x%/*.*}/."; fi' \
-            '  a+=("$x")' \
-            'done' \
-            'exec /usr/bin/cp "${a[@]}"' > "$HOME/bin/cp-luarocks"
-          chmod +x "$HOME/bin/cp-luarocks"
-          luarocks config --scope user variables.SEVENZ /mingw64/bin/7z
-          luarocks config --scope user variables.CP "$(cygpath -m /usr/bin/bash.exe) $(cygpath -m "$HOME/bin/cp-luarocks")"
-
-      - name: Install tecs-cli
-        working-directory: tecs-cli
-        run: |
-          export PATH="$HOME/bin:$HOME/.luarocks/bin:$PATH"
-          lr() { "$TECS_LUA54" "$TECS_LUAROCKS" --lua-version=5.1 "$@"; }
-          lr install --local luafilesystem
-          lr make --local --deps-mode=none tecs-cli-0.1.0-1.rockspec
-          printf '%s\n' \
-            '#!/usr/bin/env bash' \
-            'bat="$HOME/.luarocks/bin/tecs.bat"' \
-            'exec cmd //C call "$(cygpath -w "$bat")" "$@"' > "$HOME/bin/tecs"
-          chmod +x "$HOME/bin/tecs"
-
-      - name: Install Teal
-        working-directory: tecs-starter
-        run: |
-          # Lua 5.4 parses the registry; LuaRocks still targets LuaJIT 5.1.
-          export PATH="$HOME/bin:$HOME/.luarocks/bin:$PATH"
-          vendor_tree="$(pwd -W)/src/vendor"
-          "$TECS_LUA54" "$TECS_LUAROCKS" --lua-version=5.1 --dev \
-            install --tree="$vendor_tree" tl
-          cd "$GITHUB_WORKSPACE/tecs-starter"
-
-      - name: Type-check
-        working-directory: tecs-starter
-        run: |
-          export PATH="$HOME/bin:$HOME/.luarocks/bin:$PATH"
-          tecs check
-
-      - name: Build
-        working-directory: tecs-starter
-        run: |
-          export PATH="$HOME/bin:$HOME/.luarocks/bin:$PATH"
-          tecs build
+          $PSNativeCommandUseErrorActionPreference = $true
+          Remove-Item Env:TECS_DIR -ErrorAction SilentlyContinue
+          & tecs-cli/launcher/tecs.ps1 check
+          & tecs-cli/launcher/tecs.ps1 build
+          if (-not (Test-Path "build\main.lua")) { throw "main.lua was not built" }
+          if (-not (Test-Path "build\tecs2d\init.lua")) { throw "tecs2d was not built" }

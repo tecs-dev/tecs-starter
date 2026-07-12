@@ -84,7 +84,9 @@ For an even smaller starting point, keep `tecs2d.run({ game = require("plugins.g
 
 ## CI
 
-GitHub Actions installs `tecs-cli` and runs `tecs check` and `tecs build` on Linux, macOS, and Windows. The workflow checks out `tecs-dev/tecs` beside this starter and sets `TECS_DIR` so the template's local Tecs install path is exercised on every platform.
+GitHub Actions builds the headless `tecs-cli.love` payload and runs `tecs check`
+and `tecs build` through the option-1 launcher on Linux, macOS, and Windows. No
+system Lua, LuaRocks, or compiler toolchain is installed by the workflow.
 
 ## Useful References
 
