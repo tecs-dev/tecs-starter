@@ -18,30 +18,21 @@ jobs:
       - name: Check out starter
         uses: actions/checkout@v4
 
-      - name: Check out CLI
-        uses: actions/checkout@v4
-        with:
-          repository: tecs-dev/tecs-cli
-          path: tecs-cli
-
-      - name: Check out Tecs
-        uses: actions/checkout@v4
-        with:
-          repository: tecs-dev/tecs
-          path: tecs
-
-      - name: Build tecs-cli.love
+      - name: Install published Tecs CLI
         env:
-          TECS_DIR: ${{ github.workspace }}/tecs
-        run: tecs-cli/scripts/build_love.sh
+          TECS_BIN_DIR: ${{ runner.temp }}/tecs-bin
+        run: |
+          curl -fsSL https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.sh -o install-tecs.sh
+          bash install-tecs.sh
 
-      - name: Type-check and build with option 1
+      - name: Type-check and build
         env:
           TECS_CACHE_DIR: ${{ runner.temp }}/tecs-cache
-          TECS_CLI_LOVE: ${{ github.workspace }}/tecs-cli/dist/tecs-cli.love
         run: |
-          env -u TECS_DIR tecs-cli/launcher/tecs check
-          env -u TECS_DIR tecs-cli/launcher/tecs build
+          tecs="$RUNNER_TEMP/tecs-bin/tecs"
+          "$tecs" info
+          "$tecs" check
+          "$tecs" build
           test -f build/main.lua
           test -f build/tecs2d/init.lua
 
@@ -53,33 +44,23 @@ jobs:
       - name: Check out starter
         uses: actions/checkout@v4
 
-      - name: Check out CLI
-        uses: actions/checkout@v4
-        with:
-          repository: tecs-dev/tecs-cli
-          path: tecs-cli
-
-      - name: Check out Tecs
-        uses: actions/checkout@v4
-        with:
-          repository: tecs-dev/tecs
-          path: tecs
-
-      - name: Build tecs-cli.love
-        shell: bash
+      - name: Install published Tecs CLI
+        shell: pwsh
         env:
-          TECS_DIR: ${{ github.workspace }}/tecs
-        run: tecs-cli/scripts/build_love.sh
+          TECS_BIN_DIR: ${{ runner.temp }}\tecs-bin
+        run: |
+          Invoke-WebRequest https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.ps1 -OutFile install-tecs.ps1
+          & .\install-tecs.ps1
 
-      - name: Type-check and build with option 1
+      - name: Type-check and build
         shell: pwsh
         env:
           TECS_CACHE_DIR: ${{ runner.temp }}\tecs-cache
-          TECS_CLI_LOVE: ${{ github.workspace }}\tecs-cli\dist\tecs-cli.love
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          Remove-Item Env:TECS_DIR -ErrorAction SilentlyContinue
-          & tecs-cli/launcher/tecs.ps1 check
-          & tecs-cli/launcher/tecs.ps1 build
+          $tecs = Join-Path $env:RUNNER_TEMP "tecs-bin\tecs.ps1"
+          & $tecs info
+          & $tecs check
+          & $tecs build
           if (-not (Test-Path "build\main.lua")) { throw "main.lua was not built" }
           if (-not (Test-Path "build\tecs2d\init.lua")) { throw "tecs2d was not built" }
