@@ -59,11 +59,15 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           Invoke-WebRequest get.scoop.sh -OutFile install-scoop.ps1
           .\install-scoop.ps1 -RunAsAdmin
-          $scoop = Join-Path $env:USERPROFILE "scoop\shims\scoop"
+          $shims = Join-Path $env:USERPROFILE "scoop\shims"
+          $scoop = Join-Path $shims "scoop.ps1"
           & $scoop bucket add tecs https://github.com/tecs-dev/scoop-bucket
           & $scoop install tecs
-          $tecs = Join-Path $env:USERPROFILE "scoop\shims\tecs.cmd"
-          if (-not (Test-Path $tecs)) { throw "scoop did not create the tecs shim" }
+          $tecs = Join-Path $shims "tecs.cmd"
+          if (-not (Test-Path $tecs)) {
+            Get-ChildItem $shims
+            throw "scoop did not create the tecs shim"
+          }
           "TECS=$tecs" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
       - name: Type-check and build
