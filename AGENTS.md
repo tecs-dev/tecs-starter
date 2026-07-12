@@ -33,7 +33,7 @@ On Windows, use `lua tecs <target>`.
 - `assets/`: bundled demo assets. Keep license files with assets.
 - Teal declarations are installed into `src/vendor/` from LuaRocks type packages.
 - `src/vendor/`: installed LuaRocks tree.
-- `build/`: generated output. Do not hand-edit generated Lua.
+- `build/`: self-contained runtime output. Development-only Teal and LuaRocks files are pruned; do not hand-edit it.
 
 ## Tecs/Tecs2D Patterns To Preserve
 

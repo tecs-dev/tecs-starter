@@ -38,7 +38,7 @@ my-game/
 │       ├── shared.tl     # Components, constants, and asset preload
 │       └── states/       # Focused state/gameplay plugins
 ├── assets/               # Images, sounds, fonts
-├── build/                # Compiled output (generated)
+├── build/                # Self-contained, runtime-only output (generated)
 └── src/vendor/           # Installed rocks and dependencies (generated)
 ```
 

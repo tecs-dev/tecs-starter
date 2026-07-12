@@ -166,6 +166,15 @@ local function remove(path)
     end
 end
 
+local function remove_file(path)
+    path = normalize(path)
+    if not exists(path) then return end
+    local ok, err = os.remove(path)
+    if not ok then
+        error("could not remove file " .. path .. ": " .. tostring(err), 0)
+    end
+end
+
 -- Mirror src into dst. exclude_args is passed through verbatim, so callers
 -- must use the right flavor (robocopy /XF/XD vs rsync --exclude).
 local function copy_dir(src, dst, exclude_args)
@@ -487,6 +496,25 @@ local function compile_vendor_tecs_sources()
     end
 end
 
+-- Keep runtime modules and native libraries, but discard compiler inputs,
+-- LuaRocks bookkeeping, and duplicate framework copies from the game bundle.
+local function prune_runtime_vendor()
+    local vendor = path_join("build", "vendor")
+    local luaRoot = path_join(vendor, "share/lua/5.1")
+
+    remove(path_join(vendor, "bin"))
+    remove(path_join(vendor, "lib/luarocks"))
+    remove(path_join(luaRoot, "teal"))
+    remove(path_join(luaRoot, "tlcli"))
+    remove_file(path_join(luaRoot, "tl.lua"))
+    remove(path_join(luaRoot, "tecs"))
+    remove(path_join(luaRoot, "tecs2d"))
+
+    for _, source in ipairs(list_files("build", ".tl")) do
+        remove_file(source)
+    end
+end
+
 -- Copy assets/ into build/, skipping source-only files; stamp guards reruns.
 local function copy_assets()
     if not exists("assets") then return end
@@ -504,8 +532,8 @@ end
 -- Stage the runtime Lua tree into build/: the vendored rocks plus the latest
 -- tecs/tecs2d builds and their bundled internal assets. Stamp guards reruns.
 local function copy_vendor()
-    local required = path_join("build/vendor/share/lua/5.1/tecs2d/init.lua")
-    local stamp = path_join("build/vendor/.copy-stamp")
+    local required = path_join("build/tecs2d/init.lua")
+    local stamp = path_join("build/.vendor-copy-stamp")
     local tecs_build = path_join(tecs_dir, "build/tecs")
     local tecs2d_build = path_join(tecs_dir, "build/tecs2d")
     local vendor_time = math.max(
@@ -552,6 +580,7 @@ local function copy_vendor()
         remove("build/internal")
         copy_dir(internal, "build/internal")
     end
+    prune_runtime_vendor()
     write_file(stamp, tostring(os.time()) .. "\n")
 end
 
