@@ -6,8 +6,12 @@ This repo is a larger reference game for building with Tecs and Tecs2D in Teal. 
 
 - `tecs help`: show available commands.
 - `tecs run`: build and launch the game. First run downloads Love2D 12 and prepares the embedded Tecs/Tecs2D dependencies.
-- `tecs check`: type-check all Teal source files.
+- `tecs check`: type-check all Teal source files. Add `--json` for machine-readable diagnostics.
 - `tecs build`: compile Teal to `build/` and copy assets/vendor files.
+- `tecs add <rock>[@version]` / `tecs remove <rock>` / `tecs update`: vendor pure-Lua rocks
+  (and their Teal type declarations) from luarocks.org into `src/vendor/`. The committed
+  `tecs-rocks.lua` records them; check/build restore missing rocks from it.
+- `tecs info --json`: CLI/runtime versions and project status for tooling.
 - `tecs clean`: remove build output.
 - `tecs dev`: prepare local Tecs source for development iteration.
 
@@ -79,14 +83,17 @@ For an even smaller starting point, keep `tecs2d.run({ game = require("plugins.g
 - Keep new comments short and useful; this reference project should remain easy to scan.
 - Do not edit `build/` directly.
 - Do not remove third-party asset credit/license files unless the corresponding asset is removed too.
-- The CLI does not resolve LuaRocks dependencies. Keep project-owned Teal modules under `src/`.
+- Vendor third-party pure-Lua rocks with `tecs add <rock>` (never a LuaRocks installation);
+  commit the generated `tecs-rocks.lua`. Keep project-owned Teal modules under `src/`.
 - If you add new files under `src/`, verify they are included by `tecs build`.
 
 ## CI
 
-GitHub Actions installs the latest published Tecs CLI and runs `tecs check` and
-`tecs build` on Linux, macOS, and Windows. No system Lua, LuaRocks, or compiler
-toolchain is installed by the workflow.
+GitHub Actions installs the latest published Tecs CLI — via Homebrew on macOS,
+Scoop on Windows, and the standalone installer script on Linux, so every
+distribution channel stays covered — and runs `tecs check` and `tecs build` on
+all three platforms. No system Lua, LuaRocks, or compiler toolchain is
+installed by the workflow.
 
 ## Useful References
 

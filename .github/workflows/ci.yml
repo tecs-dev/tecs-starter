@@ -18,21 +18,30 @@ jobs:
       - name: Check out starter
         uses: actions/checkout@v4
 
-      - name: Install published Tecs CLI
+      # Each platform installs through a different published channel so CI
+      # exercises the Homebrew tap, the Scoop bucket, and the installer script.
+      - name: Install published Tecs CLI (Homebrew)
+        if: runner.os == 'macOS'
+        run: |
+          brew install tecs-dev/tap/tecs-cli
+          echo "TECS=$(brew --prefix)/bin/tecs" >> "$GITHUB_ENV"
+
+      - name: Install published Tecs CLI (installer script)
+        if: runner.os == 'Linux'
         env:
           TECS_BIN_DIR: ${{ runner.temp }}/tecs-bin
         run: |
           curl -fsSL https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.sh -o install-tecs.sh
           bash install-tecs.sh
+          echo "TECS=$TECS_BIN_DIR/tecs" >> "$GITHUB_ENV"
 
       - name: Type-check and build
         env:
           TECS_CACHE_DIR: ${{ runner.temp }}/tecs-cache
         run: |
-          tecs="$RUNNER_TEMP/tecs-bin/tecs"
-          "$tecs" info
-          "$tecs" check
-          "$tecs" build
+          "$TECS" info
+          "$TECS" check
+          "$TECS" build
           test -f build/main.lua
           test -f build/tecs2d/init.lua
 
@@ -44,13 +53,16 @@ jobs:
       - name: Check out starter
         uses: actions/checkout@v4
 
-      - name: Install published Tecs CLI
+      - name: Install published Tecs CLI (Scoop)
         shell: pwsh
-        env:
-          TECS_BIN_DIR: ${{ runner.temp }}\tecs-bin
         run: |
-          Invoke-WebRequest https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.ps1 -OutFile install-tecs.ps1
-          & .\install-tecs.ps1
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest get.scoop.sh -OutFile install-scoop.ps1
+          .\install-scoop.ps1 -RunAsAdmin
+          $scoop = Join-Path $env:USERPROFILE "scoop\shims\scoop"
+          & $scoop bucket add tecs https://github.com/tecs-dev/scoop-bucket
+          & $scoop install tecs
+          Join-Path $env:USERPROFILE "scoop\shims" | Out-File -Append $env:GITHUB_PATH
 
       - name: Type-check and build
         shell: pwsh
@@ -58,9 +70,8 @@ jobs:
           TECS_CACHE_DIR: ${{ runner.temp }}\tecs-cache
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          $tecs = Join-Path $env:RUNNER_TEMP "tecs-bin\tecs.ps1"
-          & $tecs info
-          & $tecs check
-          & $tecs build
+          tecs info
+          tecs check
+          tecs build
           if (-not (Test-Path "build\main.lua")) { throw "main.lua was not built" }
           if (-not (Test-Path "build\tecs2d\init.lua")) { throw "tecs2d was not built" }

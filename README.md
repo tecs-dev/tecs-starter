@@ -11,24 +11,31 @@ The Tecs CLI is the only required installation. It includes Teal, Tecs/Tecs2D,
 type declarations, and build tooling, and downloads a tested LÖVE 12 runtime
 on first use. Lua, LuaRocks, and a compiler toolchain are not required.
 
-### macOS
+### macOS and Linux
 
 ```bash
-curl -fsSL https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.sh | sh
+brew install tecs-dev/tap/tecs-cli
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.ps1 | iex
+scoop bucket add tecs https://github.com/tecs-dev/scoop-bucket
+scoop install tecs
 ```
 
 Open a new terminal after installation.
 
-### Linux
+### Standalone installers
+
+Prefer not to use a package manager?
 
 ```bash
 curl -fsSL https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.sh | sh
+```
+
+```powershell
+irm https://github.com/tecs-dev/tecs-cli/releases/latest/download/install.ps1 | iex
 ```
 
 ## Run This Reference Game
@@ -63,13 +70,18 @@ my-game/
 
 ## Build Targets
 
-| Command             | Description                                          |
-|---------------------|------------------------------------------------------|
-| `tecs run`         | Build and run the game (runs setup automatically)    |
-| `tecs build`       | Compile without running                              |
-| `tecs check`       | Type-check all Teal source files                     |
-| `tecs clean`       | Remove build artifacts                               |
-| `tecs info`        | Show CLI/runtime versions and project status         |
+| Command              | Description                                          |
+|----------------------|------------------------------------------------------|
+| `tecs run`           | Build and run the game (runs setup automatically)    |
+| `tecs build`         | Compile without running                              |
+| `tecs check`         | Type-check all Teal source files (`--json` for tooling) |
+| `tecs add <rock>`    | Vendor a pure-Lua rock and its Teal types from luarocks.org |
+| `tecs remove <rock>` | Remove a vendored rock                               |
+| `tecs update`        | Update vendored rocks to their newest versions       |
+| `tecs clean`         | Remove build artifacts                               |
+| `tecs info`          | Show CLI/runtime versions and project status (`--json` for tooling) |
+| `tecs agent`         | List bundled agent guides or print one's installed path |
+| `tecs completions`   | Print a bash, zsh, or fish completion script         |
 
 ## Hot Reload
 
