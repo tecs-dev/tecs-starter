@@ -492,7 +492,11 @@ return function(world: tecs.World)
         -- velocity), so interpolate body positions for smooth rendering.
         smoothing = "interpolate",
     }))
-    world:addPlugin(mcp.new())
-    world:addPlugin(debugPlugin.new())
+    -- This example keeps the MCP server and debugger enabled in `tecs dist`
+    -- builds so the shipped demo can be inspected and driven over MCP. It is
+    -- a demonstration of the opt-in: normal games should omit enableInDist
+    -- and let distributed builds disable both automatically.
+    world:addPlugin(mcp.new({enableInDist = true}))
+    world:addPlugin(debugPlugin.new({enableInDist = true}))
     world:addPlugin(gamePlugin)
 end
