@@ -22,7 +22,6 @@ jobs:
     runs-on: macos-latest
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      TECS_CACHE_DIR: ${{ runner.temp }}/tecs-cache
     steps:
       - name: Check out the tag
         uses: actions/checkout@v4
@@ -33,9 +32,13 @@ jobs:
         run: brew install tecs-dev/tap/tecs-cli
 
       - name: Run integration specs
+        env:
+          TECS_CACHE_DIR: ${{ runner.temp }}/tecs-cache
         run: tecs integ
 
       - name: Package
+        env:
+          TECS_CACHE_DIR: ${{ runner.temp }}/tecs-cache
         run: tecs dist
 
       - name: Attach artifacts to the release
